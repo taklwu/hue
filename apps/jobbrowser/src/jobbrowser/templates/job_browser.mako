@@ -430,7 +430,12 @@ ${ commonheader("Job Browser", "jobbrowser", user, request) | n,unicode }
               <!-- /ko -->
               <!-- /ko -->
 
+              <!-- ko if: interface() === 'schedules' -->
+              <div data-bind="template: { name: 'pagination${ SUFFIX }', data: $root.job }, visible: $root.job() != 'null' && $root.job().type() == 'schedule'"></div>
+              <!-- /ko -->
+              <!-- ko if: interface() !== 'schedules' -->
               <div data-bind="template: { name: 'pagination${ SUFFIX }', data: $root.jobs }, visible: !$root.job() && !jobs.loadingJobs()"></div>
+              <!-- /ko -->
               <!-- /ko -->
 
               % if not is_mini:
@@ -464,7 +469,7 @@ ${ commonheader("Job Browser", "jobbrowser", user, request) | n,unicode }
       <div class="modal-body">
         <p>${_('Are you sure you want to kill the selected job(s)?')}</p>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer">interface() !=='slas'&& interface() !=='oozie-info'
         <a class="btn" data-dismiss="modal">${_('No')}</a>
         <a id="killJobBtn" class="btn btn-danger disable-feedback" data-dismiss="modal" data-bind="click: function(){ if (job()) { job().control('kill'); } else { jobs.control('kill'); } }">${_('Yes')}</a>
       </div>
@@ -2322,6 +2327,41 @@ ${ commonheader("Job Browser", "jobbrowser", user, request) | n,unicode }
     var Job = function (vm, job) {
       var self = this;
 
+      self.hasPagination = ko.observable(true);
+      self.paginationPage = ko.observable(1);
+      self.paginationOffset = ko.observable(1); // Starting index
+      self.paginationOffset.subscribe(function(newValue){
+        console.log("----> paginationOffset changed: " + newValue + " | vm.interface: " + vm.interface());
+      });
+      self.paginationResultPage = ko.observable(50);
+      self.totalApps = ko.observable(null);
+      self.pagination = ko.pureComputed(function() {
+        console.log("pagination(): paginationOffset is " + self.paginationOffset() + " | vm.interface: " + vm.interface());
+        return {
+          'page': self.paginationPage(),
+          'offset': self.paginationOffset(),
+          'limit': self.paginationResultPage()
+        };
+      });
+
+      self.pagination.subscribe(function(value) {
+        self.fetchJob();
+      });
+
+      self.showPreviousPage = ko.computed(function() {
+        return self.paginationOffset() > 1;
+      });
+      self.showNextPage = ko.computed(function() {
+        return self.totalApps() != null && (self.paginationOffset() + self.paginationResultPage()) < self.totalApps();
+      });
+      self.previousPage = function() {
+        self.paginationOffset(self.paginationOffset() - self.paginationResultPage());
+      };
+      self.nextPage = function() {
+        self.paginationOffset(self.paginationOffset() + self.paginationResultPage());
+        console.log("Next Page: paginationOffset is " + self.paginationOffset() + " | vm.interface: " + vm.interface());
+      };
+
       self.id = ko.observableDefault(job.id);
       %if not is_mini:
       self.id.subscribe(function () {
@@ -2502,11 +2542,14 @@ ${ commonheader("Job Browser", "jobbrowser", user, request) | n,unicode }
           return;
         }
 
+        console.log("fetching /jobbrowser/api/job/" + vm.interface() + " | offset " + self.paginationOffset);
         return $.post("/jobbrowser/api/job/" + vm.interface(), {
           cluster: ko.mapping.toJSON(vm.compute),
           app_id: ko.mapping.toJSON(self.id),
-          interface: ko.mapping.toJSON(vm.interface)
+          interface: ko.mapping.toJSON(vm.interface),
+          pagination: ko.mapping.toJSON(self.pagination)
         }, function (data) {
+          console.log("Got result: /jobbrowser/api/job/" + vm.interface());
           if (data.status == 0) {
             if (data.app) {
               huePubSub.publish('jobbrowser.data', [data.app]);
@@ -2565,6 +2608,7 @@ ${ commonheader("Job Browser", "jobbrowser", user, request) | n,unicode }
           if (data.status == 0) {
             vm.interface(interface);
             vm.job(new Job(vm, data.app));
+            console.log("lastFetchJobRequest: " + interface);
             if (window.location.hash !== '#!id=' + vm.job().id()) {
               hueUtils.changeURL('#!id=' + vm.job().id());
             }
@@ -2673,6 +2717,9 @@ ${ commonheader("Job Browser", "jobbrowser", user, request) | n,unicode }
                       return selectedIDs.indexOf(coordinatorAction.id()) != -1
                   })
                 )
+              }
+              if (vm.job().type() == 'schedule') {
+                self.totalApps(data.app.properties.total_actions);
               }
             } else {
               requests.push(vm.job().fetchStatus());
