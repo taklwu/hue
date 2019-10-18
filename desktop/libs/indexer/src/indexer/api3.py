@@ -21,7 +21,7 @@ standard_library.install_aliases()
 from builtins import oct
 from builtins import zip
 from past.builtins import basestring
-import chardet
+from bs4 import BeautifulSoup
 import json
 import logging
 import urllib.request, urllib.error
@@ -177,7 +177,7 @@ def guess_field_types(request):
     indexer = MorphlineIndexer(request.user, request.fs)
     path = urllib_unquote(file_format["path"])
     stream = request.fs.open(path)
-    encoding = chardet.detect(stream.read(10000)).get('encoding')
+    encoding = BeautifulSoup(stream.read(10000)).original_encoding
     stream.seek(0)
     _convert_format(file_format["format"], inverse=True)
 
