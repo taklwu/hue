@@ -7,6 +7,7 @@
 #
 
 import sys
+import struct
 
 from builtins import range
 from builtins import object
@@ -3281,9 +3282,12 @@ class THandleIdentifier(object):
     return value
 
   def __repr__(self):
-    L = ['%s=%r' % (key, value)
+    L = ['%s=%r' % (key, self.unpack_guid(value))
       for key, value in self.__dict__.items()]
     return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def unpack_guid(self, guid):
+    return "%016x:%016x" % struct.unpack(b"QQ", guid)
 
   def __eq__(self, other):
     return isinstance(other, self.__class__) and self.__dict__ == other.__dict__

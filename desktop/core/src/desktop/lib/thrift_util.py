@@ -479,7 +479,11 @@ class SuperClient(object):
             self.transport.open()
           st = time.time()
 
-          str_args = _unpack_guid_secret_in_handle(repr(args))
+          # if sys.version_info[0] > 2:
+          #   str_args = _unpack_guid_secret_in_handle_py3(args)
+          # else:
+          #   str_args = _unpack_guid_secret_in_handle(repr(args))
+          str_args = repr(args)
           logging.debug("Thrift call: %s.%s(args=%s, kwargs=%s)" % (str(self.wrapped.__class__), attr, str_args, repr(kwargs)))
 
           ret = res(*args, **kwargs)
@@ -488,7 +492,8 @@ class SuperClient(object):
             coordinator_host = re.search('http_addr\':\ \'(.*:[0-9]{2,})\', \'', repr(ret))
             self.coordinator_host = coordinator_host.group(1)
 
-          log_msg = _unpack_guid_secret_in_handle(repr(ret))
+          # log_msg = _unpack_guid_secret_in_handle(repr(ret))
+          log_msg = repr(ret)
 
           # Truncate log message, increase output in DEBUG mode
           log_limit = 2000 if settings.DEBUG else 1000
@@ -549,6 +554,32 @@ def _unpack_guid_secret_in_handle(str_args):
         str_args = str_args.replace(guid.group(1), unpack_guid(encoded_guid))
       except Exception as e:
         logging.warn("Unable to unpack the secret and guid in Thrift Handle: %s" % e)
+
+  return str_args
+
+def _unpack_guid_secret_in_handle_py3(args):
+  LOG.debug("---------> %s" % type(args[0]).__name__)
+  type_of_arg = type(args[0]).__name__
+
+  if type_of_arg == 'TExecuteStatementReq' or type_of_arg == 'TGetSchemasReq' or type_of_arg == 'TGetTablesReq':
+    guid = args[0].sessionHandle.sessionId.guid
+    secret = args[0].sessionHandle.sessionId.secret
+    args[0].sessionHandle.sessionId.guid = unpack_guid(guid)
+    args[0].sessionHandle.sessionId.secret = unpack_guid(secret)
+  elif type_of_arg != 'TOpenSessionReq':
+    guid = args[0].operationHandle.operationId.guid
+    secret = args[0].operationHandle.operationId.secret
+    args[0].operationHandle.operationId.guid = unpack_guid(guid)
+    args[0].operationHandle.operationId.secret = unpack_guid(secret)
+
+  str_args = repr(args)
+
+  if type_of_arg == 'TExecuteStatementReq' or type_of_arg == 'TGetSchemasReq' or type_of_arg == 'TGetTablesReq':
+    args[0].sessionHandle.sessionId.guid = guid
+    args[0].sessionHandle.sessionId.secret = secret
+  elif type_of_arg != 'TOpenSessionReq':
+    args[0].operationHandle.operationId.guid = guid
+    args[0].operationHandle.operationId.secret = secret
 
   return str_args
 

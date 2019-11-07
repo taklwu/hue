@@ -485,13 +485,13 @@ class HiveServerQueryHandle(QueryHandle):
     if sys.version_info[0] > 2:
       return base64.b64decode(secret), base64.b64decode(guid)
     else:
-      return base64.decodestring(secret), base64.decodestring(guid)
+      return base64.decodebytes(secret), base64.decodebytes(guid)
 
   def get_encoded(self):
     if sys.version_info[0] > 2:
       return base64.b64encode(self.secret), base64.b64encode(self.guid)
     else:
-      return base64.encodestring(self.secret), base64.encodestring(self.guid)
+      return base64.encodebytes(self.secret), base64.encodebytes(self.guid)
 
 
 # Deprecated. Could be removed.
